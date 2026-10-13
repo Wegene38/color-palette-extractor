@@ -179,7 +179,22 @@
       };
     });
 
-    colors.sort((a, b) => b.count - a.count);
+    colors.forEach((c) => {
+      const hsl = rgbToHsl(c.r, c.g, c.b);
+      c.h = hsl.h;
+      c.s = hsl.s;
+      c.l = hsl.l;
+    });
+
+    colors.sort((a, b) => {
+      const aNeutral = a.s < 15;
+      const bNeutral = b.s < 15;
+      if (aNeutral && bNeutral) return a.l - b.l;
+      if (aNeutral) return -1;
+      if (bNeutral) return 1;
+      return a.h - b.h;
+    });
+
     return colors;
   }
 
