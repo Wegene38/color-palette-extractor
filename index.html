@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>科研配图配色方案提取器</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>科研配图配色方案提取器</h1>
+    <p class="subtitle">上传图片，自动提取主色调，获取 RGB 与 HSL 配色方案</p>
+  </header>
+
+  <main class="container">
+    <section class="upload-section" id="uploadSection">
+      <div class="upload-box" id="uploadBox">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <p class="upload-text">点击或拖拽图片到此处</p>
+        <p class="upload-hint">支持 JPG / PNG / WebP 等常见格式</p>
+        <input type="file" id="fileInput" accept="image/*" hidden />
+      </div>
+    </section>
+
+    <section class="control-bar" id="controlBar" hidden>
+      <div class="control-group">
+        <label for="colorCount">提取颜色数量：</label>
+        <select id="colorCount">
+          <option value="4">4 色</option>
+          <option value="6" selected>6 色</option>
+          <option value="8">8 色</option>
+          <option value="10">10 色</option>
+          <option value="12">12 色</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label class="switch-label">
+          <input type="checkbox" id="ignoreWhite" />
+          <span>忽略近白色像素</span>
+        </label>
+        <label class="switch-label">
+          <input type="checkbox" id="ignoreBlack" />
+          <span>忽略近黑色像素</span>
+        </label>
+      </div>
+      <button id="reuploadBtn" class="btn-secondary">重新上传</button>
+    </section>
+
+    <section class="result-section" id="resultSection" hidden>
+      <div class="result-grid">
+        <div class="preview-card">
+          <h2>图片预览</h2>
+          <div class="image-wrapper">
+            <img id="previewImage" alt="预览图片" />
+          </div>
+        </div>
+
+        <div class="palette-card">
+          <h2>配色方案</h2>
+          <div class="palette-list" id="paletteList"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>颜色提取在浏览器本地完成，图片不会上传到任何服务器</p>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
