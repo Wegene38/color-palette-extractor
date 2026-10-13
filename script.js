@@ -289,6 +289,20 @@
     renderPalette(colors);
   }
 
+  function loadImageFromSrc(src) {
+    const img = new Image();
+    img.onload = () => {
+      currentImageData = getImagePixels(img);
+      previewImage.src = src;
+      uploadSection.hidden = true;
+      controlBar.hidden = false;
+      resultSection.hidden = false;
+      extractPalette();
+    };
+    img.onerror = () => showToast("图片加载失败");
+    img.src = src;
+  }
+
   function handleImage(file) {
     if (!file.type.startsWith("image/")) {
       showToast("请上传图片文件");
@@ -296,22 +310,28 @@
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        currentImageData = getImagePixels(img);
-        previewImage.src = e.target.result;
-        uploadSection.hidden = true;
-        controlBar.hidden = false;
-        resultSection.hidden = false;
-        extractPalette();
-      };
-      img.onerror = () => showToast("图片加载失败");
-      img.src = e.target.result;
-    };
+    reader.onload = (e) => loadImageFromSrc(e.target.result);
     reader.onerror = () => showToast("文件读取失败");
     reader.readAsDataURL(file);
   }
+
+  document.addEventListener("paste", (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith("image/")) {
+        const blob = item.getAsFile();
+        if (blob) {
+          e.preventDefault();
+          const url = URL.createObjectURL(blob);
+          loadImageFromSrc(url);
+          showToast("已从剪贴板读取图片");
+          return;
+        }
+      }
+    }
+  });
 
   uploadBox.addEventListener("click", () => fileInput.click());
 
