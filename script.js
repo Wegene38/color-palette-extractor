@@ -36,38 +36,108 @@
     );
   }
 
-  function rgbToHsl(r, g, b) {
-    r /= 255;
-    g /= 255;
-    b /= 255;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    let h = 0;
-    let s = 0;
-    const l = (max + min) / 2;
+  function rgbToLab(r, g, b) {
+    const lin = (v) => {
+      v /= 255;
+      return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    };
+    const rl = lin(r);
+    const gl = lin(g);
+    const bl = lin(b);
 
-    if (max !== min) {
-      const d = max - min;
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-      switch (max) {
-        case r:
-          h = (g - b) / d + (g < b ? 6 : 0);
-          break;
-        case g:
-          h = (b - r) / d + 2;
-          break;
-        case b:
-          h = (r - g) / d + 4;
-          break;
-      }
-      h *= 60;
-    }
+    const x = (0.4124 * rl + 0.3576 * gl + 0.1805 * bl) / 0.95047;
+    const y = 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
+    const z = (0.0193 * rl + 0.1192 * gl + 0.9505 * bl) / 1.08883;
+
+    const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+    const fx = f(x);
+    const fy = f(y);
+    const fz = f(z);
 
     return {
-      h: Math.round(h),
-      s: Math.round(s * 100),
-      l: Math.round(l * 100),
+      L: 116 * fy - 16,
+      a: 500 * (fx - fy),
+      b: 200 * (fy - fz),
     };
+  }
+
+  function labDistance(p, q) {
+    const dL = p.L - q.L;
+    const da = p.a - q.a;
+    const db = p.b - q.b;
+    return Math.sqrt(dL * dL + da * da + db * db);
+  }
+
+  // 在 Lab 空间中求经过所有颜色的最短开放路径（Held-Karp 动态规划，颜色数 ≤ 12 时开销很小），
+  // 使相邻颜色的感知差异之和最小。start 不为 -1 时固定从该点出发。返回下标顺序。
+  function shortestPath(labs, start) {
+    const n = labs.length;
+    if (n <= 2) return labs.map((_, i) => i);
+
+    const dist = labs.map((p) => labs.map((q) => labDistance(p, q)));
+    const full = 1 << n;
+    const dp = new Float64Array(full * n).fill(Infinity);
+    const parent = new Int8Array(full * n).fill(-1);
+    for (let j = 0; j < n; j++) {
+      if (start === -1 || j === start) dp[(1 << j) * n + j] = 0;
+    }
+
+    for (let mask = 1; mask < full; mask++) {
+      for (let j = 0; j < n; j++) {
+        const cur = dp[mask * n + j];
+        if (cur === Infinity) continue;
+        for (let k = 0; k < n; k++) {
+          if (mask & (1 << k)) continue;
+          const next = (mask | (1 << k)) * n + k;
+          const cost = cur + dist[j][k];
+          if (cost < dp[next]) {
+            dp[next] = cost;
+            parent[next] = j;
+          }
+        }
+      }
+    }
+
+    const last = full - 1;
+    let end = 0;
+    for (let j = 1; j < n; j++) {
+      if (dp[last * n + j] < dp[last * n + end]) end = j;
+    }
+
+    const order = [];
+    let mask = last;
+    let j = end;
+    while (j !== -1) {
+      order.push(j);
+      const p = parent[mask * n + j];
+      mask &= ~(1 << j);
+      j = p;
+    }
+    return order.reverse();
+  }
+
+  // 中性色（白 / 灰 / 黑）按明度由浅到深排在前面；彩色按 Lab 最短路径排列，
+  // 并以最后一个中性色为起点求路径，使整条色板连续渐变。
+  function sortByGradient(colors) {
+    const items = colors.map((c) => {
+      const lab = rgbToLab(c.r, c.g, c.b);
+      return { color: c, lab, chroma: Math.hypot(lab.a, lab.b) };
+    });
+
+    const neutrals = items.filter((it) => it.chroma < 8).sort((p, q) => q.lab.L - p.lab.L);
+    const chromatic = items.filter((it) => it.chroma >= 8);
+
+    let order;
+    if (neutrals.length) {
+      const anchor = neutrals[neutrals.length - 1];
+      const labs = [anchor.lab].concat(chromatic.map((it) => it.lab));
+      order = shortestPath(labs, 0).slice(1).map((i) => chromatic[i - 1]);
+    } else {
+      order = shortestPath(chromatic.map((it) => it.lab), -1).map((i) => chromatic[i]);
+      if (order.length > 1 && order[order.length - 1].lab.L > order[0].lab.L) order.reverse();
+    }
+
+    return neutrals.concat(order).map((it) => it.color);
   }
 
   function getImagePixels(img) {
@@ -191,23 +261,7 @@
       };
     });
 
-    colors.forEach((c) => {
-      const hsl = rgbToHsl(c.r, c.g, c.b);
-      c.h = hsl.h;
-      c.s = hsl.s;
-      c.l = hsl.l;
-    });
-
-    colors.sort((a, b) => {
-      const aNeutral = a.s < 15;
-      const bNeutral = b.s < 15;
-      if (aNeutral && bNeutral) return a.l - b.l;
-      if (aNeutral) return -1;
-      if (bNeutral) return 1;
-      return a.h - b.h;
-    });
-
-    return colors;
+    return sortByGradient(colors);
   }
 
   function copyToClipboard(text, toastMessage) {
