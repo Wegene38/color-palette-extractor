@@ -11,10 +11,13 @@
   const colorCountSelect = document.getElementById("colorCount");
   const ignoreWhiteCheckbox = document.getElementById("ignoreWhite");
   const ignoreBlackCheckbox = document.getElementById("ignoreBlack");
+  const ignoreGrayCheckbox = document.getElementById("ignoreGray");
   const reuploadBtn = document.getElementById("reuploadBtn");
+  const copyAllBtn = document.getElementById("copyAllBtn");
   const toast = document.getElementById("toast");
 
   let currentImageData = null;
+  let currentColors = [];
 
   function showToast(message) {
     toast.textContent = message;
@@ -83,9 +86,17 @@
     return imageData.data;
   }
 
+  function isNearGray(r, g, b) {
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const avg = (r + g + b) / 3;
+    return max - min <= 18 && avg >= 20 && avg <= 235;
+  }
+
   function quantize(pixels, colorCount, options) {
     const ignoreWhite = options.ignoreWhite;
     const ignoreBlack = options.ignoreBlack;
+    const ignoreGray = options.ignoreGray;
 
     const points = [];
     for (let i = 0; i < pixels.length; i += 4) {
@@ -97,6 +108,7 @@
 
       if (ignoreWhite && r > 240 && g > 240 && b > 240) continue;
       if (ignoreBlack && r < 15 && g < 15 && b < 15) continue;
+      if (ignoreGray && isNearGray(r, g, b)) continue;
 
       points.push([r, g, b]);
     }
@@ -198,18 +210,19 @@
     return colors;
   }
 
-  function copyToClipboard(text) {
+  function copyToClipboard(text, toastMessage) {
+    const message = toastMessage || "已复制：" + text;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(
-        () => showToast("已复制：" + text),
-        () => fallbackCopy(text)
+        () => showToast(message),
+        () => fallbackCopy(text, message)
       );
     } else {
-      fallbackCopy(text);
+      fallbackCopy(text, message);
     }
   }
 
-  function fallbackCopy(text) {
+  function fallbackCopy(text, toastMessage) {
     const textarea = document.createElement("textarea");
     textarea.value = text;
     textarea.style.position = "fixed";
@@ -218,11 +231,20 @@
     textarea.select();
     try {
       document.execCommand("copy");
-      showToast("已复制：" + text);
+      showToast(toastMessage || "已复制：" + text);
     } catch (e) {
       showToast("复制失败");
     }
     document.body.removeChild(textarea);
+  }
+
+  function paletteCopyText(colors) {
+    return colors
+      .map((c) => {
+        const hex = rgbToHex(c.r, c.g, c.b);
+        return `${hex}  rgb(${c.r}, ${c.g}, ${c.b})`;
+      })
+      .join("\n");
   }
 
   function renderPalette(colors) {
@@ -243,9 +265,7 @@
       info.className = "color-info";
 
       const hex = rgbToHex(color.r, color.g, color.b);
-      const hsl = rgbToHsl(color.r, color.g, color.b);
       const rgbStr = `rgb(${color.r}, ${color.g}, ${color.b})`;
-      const hslStr = `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
 
       info.innerHTML = `
         <div>
@@ -255,10 +275,6 @@
         <div>
           <span class="label">RGB</span>
           <span class="value" data-copy="${rgbStr}">${rgbStr}</span>
-        </div>
-        <div>
-          <span class="label">HSL</span>
-          <span class="value" data-copy="${hslStr}">${hslStr}</span>
         </div>
       `;
 
@@ -278,14 +294,19 @@
     const colors = quantize(currentImageData, colorCount, {
       ignoreWhite: ignoreWhiteCheckbox.checked,
       ignoreBlack: ignoreBlackCheckbox.checked,
+      ignoreGray: ignoreGrayCheckbox.checked,
     });
 
     if (colors.length === 0) {
+      currentColors = [];
+      copyAllBtn.disabled = true;
       paletteList.innerHTML =
         '<p style="color:var(--text-muted);text-align:center;padding:24px;">未能提取到颜色，请尝试调整过滤选项</p>';
       return;
     }
 
+    currentColors = colors;
+    copyAllBtn.disabled = false;
     renderPalette(colors);
   }
 
@@ -365,10 +386,18 @@
   colorCountSelect.addEventListener("change", extractPalette);
   ignoreWhiteCheckbox.addEventListener("change", extractPalette);
   ignoreBlackCheckbox.addEventListener("change", extractPalette);
+  ignoreGrayCheckbox.addEventListener("change", extractPalette);
+
+  copyAllBtn.addEventListener("click", () => {
+    if (!currentColors.length) return;
+    copyToClipboard(paletteCopyText(currentColors), "已复制全部配色方案");
+  });
 
   reuploadBtn.addEventListener("click", () => {
     fileInput.value = "";
     currentImageData = null;
+    currentColors = [];
+    copyAllBtn.disabled = true;
     uploadSection.hidden = false;
     controlBar.hidden = true;
     resultSection.hidden = true;

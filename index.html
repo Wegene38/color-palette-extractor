@@ -9,7 +9,7 @@
 <body>
   <header class="app-header">
     <h1>科研配图配色方案提取器</h1>
-    <p class="subtitle">上传图片，自动提取主色调，获取 RGB 与 HSL 配色方案</p>
+    <p class="subtitle">上传图片，自动提取主色调，获取 HEX 与 RGB 配色方案</p>
   </header>
 
   <main class="container">
@@ -46,23 +46,28 @@
           <input type="checkbox" id="ignoreBlack" />
           <span>忽略近黑色像素</span>
         </label>
+        <label class="switch-label">
+          <input type="checkbox" id="ignoreGray" />
+          <span>忽略近灰色像素</span>
+        </label>
       </div>
       <button id="reuploadBtn" class="btn-secondary">重新上传</button>
     </section>
 
     <section class="result-section" id="resultSection" hidden>
-      <div class="result-grid">
-        <div class="preview-card">
-          <h2>图片预览</h2>
-          <div class="image-wrapper">
-            <img id="previewImage" alt="预览图片" />
-          </div>
+      <div class="preview-card">
+        <h2>图片预览</h2>
+        <div class="image-wrapper">
+          <img id="previewImage" alt="预览图片" />
         </div>
+      </div>
 
-        <div class="palette-card">
+      <div class="palette-card">
+        <div class="palette-header">
           <h2>配色方案</h2>
-          <div class="palette-list" id="paletteList"></div>
+          <button type="button" id="copyAllBtn" class="btn-primary" disabled>复制全部配色</button>
         </div>
+        <div class="palette-list" id="paletteList"></div>
       </div>
     </section>
   </main>
